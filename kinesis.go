@@ -107,7 +107,6 @@ func (p *Producer) Put(data []byte, partitionKey string) error {
 
 // Start the producer.
 func (p *Producer) Start() {
-	p.Logger.Info("starting producer")
 	go p.loop()
 }
 
