@@ -33,6 +33,9 @@ type Config struct {
 	// BufferSize determines the batch request size. Must not exceed 500. Defaults to 500.
 	BufferSize int
 
+	// BacklogSize determines the channel capacity before Put() will begin blocking. Defaults to 500.
+	BacklogSize int
+
 	// Backoff determines the backoff strategy for record failures.
 	Backoff backoff.Backoff
 
@@ -62,6 +65,10 @@ func (c *Config) defaults() {
 		panic("kinesis: BufferSize exceeds 500")
 	}
 
+	if c.BacklogSize == 0 {
+		c.BacklogSize = maxRecordsPerRequest
+	}
+
 	if c.FlushInterval == 0 {
 		c.FlushInterval = time.Second
 	}
@@ -79,7 +86,7 @@ func New(config Config) *Producer {
 	config.defaults()
 	return &Producer{
 		Config:  config,
-		records: make(chan *k.PutRecordsRequestEntry),
+		records: make(chan *k.PutRecordsRequestEntry, config.BacklogSize),
 		done:    make(chan struct{}),
 	}
 }
@@ -106,28 +113,40 @@ func (p *Producer) Start() {
 
 // Stop the producer. Flushes any in-flight data.
 func (p *Producer) Stop() {
-	p.Logger.Info("stopping producer")
+	p.Logger.WithField("backlog", len(p.records)).Info("stopping producer")
 
+	// drain
 	p.done <- struct{}{}
 	close(p.records)
 
+	// wait
 	<-p.done
-	close(p.done)
+
+	p.Logger.Info("stopped producer")
 }
 
 // loop and flush at the configured interval, or when the buffer is exceeded.
 func (p *Producer) loop() {
 	buf := make([]*k.PutRecordsRequestEntry, 0, p.BufferSize)
 	tick := time.NewTicker(p.FlushInterval)
+	drain := false
+
 	defer tick.Stop()
+	defer close(p.done)
 
 	for {
 		select {
 		case record := <-p.records:
 			buf = append(buf, record)
+
 			if len(buf) >= p.BufferSize {
 				p.flush(buf, "buffer size")
 				buf = nil
+			}
+
+			if drain && len(p.records) == 0 {
+				p.Logger.Info("drained")
+				return
 			}
 		case <-tick.C:
 			if len(buf) > 0 {
@@ -135,12 +154,11 @@ func (p *Producer) loop() {
 				buf = nil
 			}
 		case <-p.done:
-			if len(buf) > 0 {
-				p.flush(buf, "stop")
-				buf = nil
+			drain = true
+
+			if len(p.records) == 0 {
+				return
 			}
-			p.done <- struct{}{}
-			return
 		}
 	}
 }

@@ -20,8 +20,9 @@ func main() {
 	log.SetLevel(log.DebugLevel)
 
 	producer := kinesis.New(kinesis.Config{
-		StreamName: "logs",
-		Client:     client,
+		StreamName:  "logs",
+		BacklogSize: 2000,
+		Client:      client,
 	})
 
 	producer.Start()
@@ -43,7 +44,7 @@ func main() {
 	}
 
 	go func() {
-		for i := 0; i < 10000; i++ {
+		for i := 0; i < 5000; i++ {
 			err := producer.Put(b, "site")
 			if err != nil {
 				log.WithError(err).Fatal("error producing")
