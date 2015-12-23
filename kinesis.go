@@ -1,3 +1,4 @@
+// Package kinesis implements a batch producer built on top of the official AWS SDK.
 package kinesis
 
 import (
