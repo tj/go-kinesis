@@ -107,8 +107,12 @@ func (p *Producer) Start() {
 // Stop the producer. Flushes any in-flight data.
 func (p *Producer) Stop() {
 	p.Logger.Info("stopping producer")
+
 	p.done <- struct{}{}
+	close(p.records)
+
 	<-p.done
+	close(p.done)
 }
 
 // loop and flush at the configured interval, or when the buffer is exceeded.
