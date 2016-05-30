@@ -175,18 +175,24 @@ func (p *Producer) flush(records []*k.PutRecordsRequestEntry, reason string) {
 	})
 
 	if err != nil {
-		// TODO(tj): confirm that the AWS SDK handles retries of request-level errors
-		// otherwise we need to backoff here as well.
 		p.Logger.WithError(err).Error("flush")
-		p.Backoff.Reset()
+		p.backoff(len(records))
+		p.flush(records, "error")
 		return
 	}
 
 	failed := *out.FailedRecordCount
 	if failed == 0 {
+		p.Backoff.Reset()
 		return
 	}
 
+	p.backoff(int(failed))
+	p.flush(failures(records, out.Records), "retry")
+}
+
+// calculates backoff duration and pauses execution
+func (p *Producer) backoff(failed int) {
 	backoff := p.Backoff.Duration()
 
 	p.Logger.WithFields(log.Fields{
@@ -195,8 +201,6 @@ func (p *Producer) flush(records []*k.PutRecordsRequestEntry, reason string) {
 	}).Warn("put failures")
 
 	time.Sleep(backoff)
-
-	p.flush(failures(records, out.Records), "retry")
 }
 
 // failures returns the failed records as indicated in the response.
