@@ -7,22 +7,16 @@ import (
 
 	"github.com/apex/log"
 	"github.com/apex/log/handlers/text"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	k "github.com/aws/aws-sdk-go/service/kinesis"
 	"github.com/tj/go-kinesis"
 )
 
 func main() {
-	client := k.New(session.New(aws.NewConfig()))
-
 	log.SetHandler(text.New(os.Stderr))
 	log.SetLevel(log.DebugLevel)
 
 	producer := kinesis.New(kinesis.Config{
 		StreamName:  "logs",
 		BacklogSize: 2000,
-		Client:      client,
 	})
 
 	producer.Start()
