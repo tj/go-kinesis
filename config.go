@@ -1,6 +1,8 @@
 package kinesis
 
 import (
+	"fmt"
+	"hash/fnv"
 	"time"
 
 	"github.com/apex/log"
@@ -36,6 +38,9 @@ type Config struct {
 
 	// Client is the Kinesis API implementation.
 	Client kinesisiface.KinesisAPI
+
+	// PartionKey is a function which will generate a partition key based on your data
+	PartitionKeyGenerator func([]byte) *string
 }
 
 // defaults for configuration.
@@ -75,4 +80,14 @@ func (c *Config) defaults() {
 	if c.FlushInterval == 0 {
 		c.FlushInterval = time.Second
 	}
+
+	if c.PartitionKeyGenerator == nil {
+		c.PartitionKey = defaultPartitionKeyGenerator
+	}
+}
+
+func defaultPartitionKeyGenerator(b []byte) *string {
+	hash := fnv.New64a()
+	hash.Write(b)
+	return aws.String(fmt.Sprintf("%d", hash.Sum64()))
 }

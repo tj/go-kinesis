@@ -38,14 +38,14 @@ func New(config Config) *Producer {
 }
 
 // Put record `data` using `partitionKey`. This method is thread-safe.
-func (p *Producer) Put(data []byte, partitionKey string) error {
+func (p *Producer) Write(data []byte) (int, error) {
 	if len(data) > maxRecordSize {
 		return ErrRecordSizeExceeded
 	}
 
 	p.records <- &k.PutRecordsRequestEntry{
 		Data:         data,
-		PartitionKey: &partitionKey,
+		PartitionKey: p.Config.PartitionKey(),
 	}
 
 	return nil
