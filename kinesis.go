@@ -82,6 +82,11 @@ func (p *Producer) loop() {
 	for {
 		select {
 		case record := <-p.records:
+			if len(buf)+len(record) > maxRequestSize {
+				p.flush(buf, "request size")
+				buf = nil
+			}
+
 			buf = append(buf, record)
 
 			if len(buf) >= p.BufferSize {
