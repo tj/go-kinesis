@@ -85,7 +85,7 @@ func (p *Producer) loop() {
 		case record := <-p.records:
 			recordSize := len(record.Data)
 
-			if len(recordSize) > maxRecordSize {
+			if recordSize > maxRecordSize {
 				log.WithField("size", recordSize).Error("record too big")
 				continue
 			}
