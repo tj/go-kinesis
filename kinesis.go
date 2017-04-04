@@ -73,6 +73,7 @@ func (p *Producer) Stop() {
 // loop and flush at the configured interval, or when the buffer is exceeded.
 func (p *Producer) loop() {
 	buf := make([]*k.PutRecordsRequestEntry, 0, p.BufferSize)
+	bufSize := 0
 	tick := time.NewTicker(p.FlushInterval)
 	drain := false
 
@@ -82,16 +83,26 @@ func (p *Producer) loop() {
 	for {
 		select {
 		case record := <-p.records:
-			if len(buf)+len(record) > maxRequestSize {
+			recordSize := len(record.Data)
+
+			if len(recordSize) > maxRecordSize {
+				log.WithField("size", recordSize).Error("record too big")
+				continue
+			}
+
+			if bufSize+recordSize > maxRequestSize {
 				p.flush(buf, "request size")
 				buf = nil
+				bufSize = 0
 			}
 
 			buf = append(buf, record)
+			bufSize += len(record.Data)
 
 			if len(buf) >= p.BufferSize {
 				p.flush(buf, "buffer size")
 				buf = nil
+				bufSize = 0
 			}
 
 			if drain && len(p.records) == 0 {
@@ -102,6 +113,7 @@ func (p *Producer) loop() {
 			if len(buf) > 0 {
 				p.flush(buf, "interval")
 				buf = nil
+				bufSize = 0
 			}
 		case <-p.done:
 			drain = true
