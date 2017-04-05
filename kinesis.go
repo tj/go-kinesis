@@ -9,10 +9,10 @@ import (
 	k "github.com/aws/aws-sdk-go/service/kinesis"
 )
 
-// Size limits as defined by http://docs.aws.amazon.com/kinesis/latest/APIReference/API_PutRecords.html.
 const (
-	maxRecordSize  = 1 << 20 // 1MiB
-	maxRequestSize = 5 << 20 // 5MiB
+	megaByte       = 1 << 20
+	maxRecordSize  = megaByte
+	maxRequestSize = 5 * megaByte
 )
 
 // Errors.
@@ -39,7 +39,7 @@ func New(config Config) *Producer {
 
 // Put record `data` using `partitionKey`. This method is thread-safe.
 func (p *Producer) Put(data []byte, partitionKey string) error {
-	if len(data) > maxRecordSize {
+	if len(data)+len(partitionKey) > maxRecordSize {
 		return ErrRecordSizeExceeded
 	}
 
@@ -73,6 +73,7 @@ func (p *Producer) Stop() {
 // loop and flush at the configured interval, or when the buffer is exceeded.
 func (p *Producer) loop() {
 	buf := make([]*k.PutRecordsRequestEntry, 0, p.BufferSize)
+	bufSize := 0
 	tick := time.NewTicker(p.FlushInterval)
 	drain := false
 
@@ -82,11 +83,21 @@ func (p *Producer) loop() {
 	for {
 		select {
 		case record := <-p.records:
+			recordSize := len(*record.PartitionKey) + len(record.Data)
+
+			if bufSize+recordSize > maxRequestSize {
+				p.flush(buf, "request size")
+				buf = nil
+				bufSize = 0
+			}
+
 			buf = append(buf, record)
+			bufSize += recordSize
 
 			if len(buf) >= p.BufferSize {
 				p.flush(buf, "buffer size")
 				buf = nil
+				bufSize = 0
 			}
 
 			if drain && len(p.records) == 0 {
@@ -97,6 +108,7 @@ func (p *Producer) loop() {
 			if len(buf) > 0 {
 				p.flush(buf, "interval")
 				buf = nil
+				bufSize = 0
 			}
 		case <-p.done:
 			drain = true
