@@ -10,10 +10,9 @@ import (
 )
 
 const (
-	MegaByte = 1 << 20
-
-	maxRecordSize  = MegaByte
-	maxRequestSize = 5 * MegaByte
+	megaByte       = 1 << 20
+	maxRecordSize  = megaByte
+	maxRequestSize = 5 * megaByte
 )
 
 // Errors.
