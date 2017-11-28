@@ -100,6 +100,10 @@ func (p *Producer) loop() {
 			}
 		case <-p.done:
 			drain = true
+			if len(buf) > 0 {
+				p.flush(buf, "stopping")
+				buf = nil
+			}
 
 			if len(p.records) == 0 {
 				return
