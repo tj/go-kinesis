@@ -22,6 +22,9 @@ type Config struct {
 	// FlushInterval is a regular interval for flushing the buffer. Defaults to 1s.
 	FlushInterval time.Duration
 
+	// (optional) Override the AWS region.
+	Region string
+
 	// BufferSize determines the batch request size. Must not exceed 500. Defaults to 500.
 	BufferSize int
 
@@ -41,7 +44,7 @@ type Config struct {
 // defaults for configuration.
 func (c *Config) defaults() {
 	if c.Client == nil {
-		c.Client = k.New(session.New(aws.NewConfig()))
+		c.Client = k.New(session.New(aws.NewConfig().WithRegion(c.Region)))
 	}
 
 	if c.Logger == nil {
